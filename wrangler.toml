@@ -1,0 +1,12 @@
+account_id = "04570324a547adf0469e0ef6019861c2"
+name = "clock-backend"
+type = "webpack"
+route = "serverless.connorpeshek.me/*"
+workers_dev = false
+zone_id = "937f9b9957ce4bcb4966c579002b7aca"
+kv-namespaces = [
+  { binding = "clock_users", id = "30879675fe054b9d981c37ee37993ea3" },
+  { binding = "clock_times", id = "c159953c036340ef8588df5c2df6ad24" },
+  { binding = "CRYPTO", id = "d51074ba685f4cf194d564c10c181676" },
+  { binding = "SESSIONS", id = "ff2ef54cd015425a82c28fc54b330d05" }
+]
