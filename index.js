@@ -65,12 +65,12 @@ async function createSession(obj) {
   const hashHex = createHex(signature)
   const date = Date.now()
   const session = {
-    user: obj.Login,
+    user: obj.login,
     expires: date + (60 * 60 * 24 * 14)
   }
   await SESSIONS.put(base64, JSON.stringify(session))
   obj.Session = base64
-  await clock_users.put(obj.Login, obj)
+  await clock_users.put(obj.login, obj)
   return `${base64}.${hashHex}`
 }
 
@@ -170,10 +170,10 @@ async function register(req) {
     const hash = await crypto.subtle.digest("SHA-512", new TextEncoder().encode(`${Password}${user.Salt}${PEPPER}`))
     const hashArray = Array.from(new Uint8Array(hash))
     const hashHex = hashArray.map(b => b.toString(16).padStart(2,'0')).join('')
-    user.Login = user.Login.toLowerCase()
+    user.login = user.login.toLowerCase()
     user.Password = hashHex
-    await clock_users.put(user.Login, JSON.stringify(user))
-    await clock_times.put(user.Login, JSON.stringify([]))
+    await clock_users.put(user.login, JSON.stringify(user))
+    await clock_times.put(user.login, JSON.stringify([]))
     const sess = createSession()
     const response = new Response("User has been created")
     response.headers.append("Set-Cookie", `session=${sess}; path=/; HttpOnly; Secure`)
