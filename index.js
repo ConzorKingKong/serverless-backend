@@ -157,6 +157,17 @@ function newRandomBase64() {
   return base64String
 }
 
+function createUUID() {
+  const arr0 = createRandomArrayBuffer(4)
+  const arr1 = createRandomArrayBuffer(2)
+  const arr2 = createRandomArrayBuffer(2)
+  const arr3 = createRandomArrayBuffer(2)
+  const arr4 = createRandomArrayBuffer(6)
+  arr2[0] = 0x40 | (arr2[0] & 0xf)
+  arr3[0] = 0x80 | (arr3[0] & 0x3f)
+  return `${createHex(arr0)}-${createHex(arr1)}-${createHex(arr2)}-${createHex(arr3)}-${createHex(arr4)}`
+}
+
 async function login(req) {
   // maybe handle options
   const user = await req.json()
@@ -234,6 +245,7 @@ async function loginStatus(req) {
 }
 
 async function newTime(req) {
+  let requestBody = await req.json()
   let user = verifySession(req.headers.get("cookie"))
   if (user.verified === false) {
     const response = new Response("Session expired, please log in again")
@@ -242,8 +254,12 @@ async function newTime(req) {
   }
   const times = clock_times.get(user.session.email, "json")
   // check all times for a duplicate time
-  // generate GUID for new time
-  // add new time and return an array of all times
+  const UUID = createUUID()
+  // code is probably not right
+  // definitely need input validation
+  requestBody.time.id = UUID
+  times.push(req.time)
+  clock_times.put(user.session.email, JSON.stringify(times))
   return new Response(JSON.stringify(times))
 }
 
