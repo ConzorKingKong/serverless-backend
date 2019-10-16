@@ -8,8 +8,8 @@ async function handleRequest(request) {
     const r = new Router()
     r.post('/login', req => login(req))
     r.post('/register', req => register(req))
+    r.get('/loginstatus', req => loginStatus(req))
     r.post('/newTime', req => newTime(req))
-    r.post('/test2', req => callsess(req))
     r.get('/', () => new Response('Hello worker!'))
     
     const resp = await r.route(request)
@@ -151,11 +151,6 @@ async function verifySession(cookie) {
   }
 }
 
-async function callsess(req) {
-  const vale = await verifySession(req.headers.get("cookie"))
-  return new Response(JSON.stringify(vale))
-}
-
 function newRandomBase64() {
   let arr = createRandomArrayBuffer(8)
   let base64String = btoa(String.fromCharCode.apply(null, new Uint8Array(arr)))
@@ -228,6 +223,16 @@ async function register(req) {
   return new Response("Please enter a valid email")
 }
 
+async function loginStatus(req) {
+  let user = verifySession(req.headers.get("cookie"))
+  if (user.verified === false) {
+    const response = new Response("Session expired, please log in again")
+    response.headers.set('cookie', '')
+    return response
+  }
+  return new Response("session is active")
+}
+
 async function newTime(req) {
   let user = verifySession(req.headers.get("cookie"))
   if (user.verified === false) {
@@ -236,6 +241,9 @@ async function newTime(req) {
     return response
   }
   const times = clock_times.get(user.session.email, "json")
+  // check all times for a duplicate time
+  // generate GUID for new time
+  // add new time and return an array of all times
   return new Response(JSON.stringify(times))
 }
 
