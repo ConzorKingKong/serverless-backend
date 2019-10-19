@@ -6,10 +6,12 @@ addEventListener('fetch', event => {
 
 async function handleRequest(request) {
     const r = new Router()
-    r.post('/login', req => login(req))
     r.post('/register', req => register(req))
+    r.post('/login', req => login(req))
+    r.post('/logout', req => logout(req))
     r.get('/loginstatus', req => loginStatus(req))
-    r.post('/newTime', req => newTime(req))
+    r.post('/newtime', req => newTime(req))
+    r.post('/deletetime', req => deleteTime(req))
     r.get('/', () => new Response('Hello worker!'))
     
     const resp = await r.route(request)
@@ -104,7 +106,7 @@ async function createSession(obj) {
   const hashHex = createHex(signature)
   const date = Date.now()
   const session = {
-    user: obj.email,
+    email: obj.email,
     expires: date + (60 * 60 * 24 * 14)
   }
   // store session in 'session table'
@@ -224,18 +226,33 @@ async function register(req) {
     const hashHex = createHex(hash)
     user.email = user.email.toLowerCase()
     user.password = hashHex
+    const times = []
     await clock_users.put(user.email, JSON.stringify(user))
-    await clock_times.put(user.email, JSON.stringify([]))
+    await clock_times.put(user.email, JSON.stringify(times))
     const session = await createSession(user)
-    const response = new Response("User has been created")
+    const response = new Response(JSON.stringify(times))
     response.headers.append("Set-Cookie", `session=${session}; path=/; HttpOnly; Secure`)
     return response
   }
   return new Response("Please enter a valid email")
 }
 
+async function logout(req) {
+  let user = await verifySession(req.headers.get("cookie"))
+  if (user.verified === false) {
+    const response = new Response("You are not logged in")
+    response.headers.set('cookie', '')
+    return response
+  }
+  const kvUser = await clock_users.get(user.session.email, "json")
+  await SESSIONS.delete(kvUser.session)
+  kvUser.session = ""
+  await clock_users.put(user.session.email, JSON.stringify(kvUser))
+  return new Response("Logged out")
+}
+
 async function loginStatus(req) {
-  let user = verifySession(req.headers.get("cookie"))
+  let user = await verifySession(req.headers.get("cookie"))
   if (user.verified === false) {
     const response = new Response("Session expired, please log in again")
     response.headers.set('cookie', '')
@@ -245,30 +262,87 @@ async function loginStatus(req) {
 }
 
 async function newTime(req) {
-  let requestBody = await req.json()
-  let user = verifySession(req.headers.get("cookie"))
+  let cont
+  let postedTime
+  try {
+    postedTime = await req.json()
+  } catch(e) {
+    return new Response(e)
+  }
+  let user
+  try {
+    user = await verifySession(req.headers.get("cookie"))
+  } catch(e) {
+    return new Response(e)
+  }
   if (user.verified === false) {
     const response = new Response("Session expired, please log in again")
     response.headers.set('cookie', '')
     return response
   }
-  const times = clock_times.get(user.session.email, "json")
+  const times = await clock_times.get(user.session.email, "json")
+  if (postedTime._id) {
+    const newTimes = times.map(time => {
+      if (time._id === postedTime._id) {
+        time = postedTime
+      }
+      return time
+    })
+    // Currently, if someone posts with an _id, but
+    // that ID doesn't exist in KV, it just returns
+    // previous times. Unsure how I should handle, considering
+    // how KV works. Probably a sign of someone misusing the
+    // app if they post without an ID that already exists
+    return new Response(JSON.stringify(newTimes))
+  } else {
+    times.forEach(time => {
+      if (time.hours === postedTime.hours && time.minutes === postedTime.minutes && time.seconds === postedTime.seconds && time.ampm === postedTime.ampm) {
+        cont = false
+      }
+    })
+  }
+  if (cont === false) return new Response("Time already exists. Please edit the days on the old time")
   // check all times for a duplicate time
   const UUID = createUUID()
-  // code is probably not right
-  // definitely need input validation
-  requestBody.time.id = UUID
-  times.push(req.time)
-  clock_times.put(user.session.email, JSON.stringify(times))
+  postedTime._id = UUID
+  times.push(postedTime)
+  await clock_times.put(user.session.email, JSON.stringify(times))
   return new Response(JSON.stringify(times))
 }
 
-// new time
-// edit time
-// delete time
+async function deleteTime(req) {
+  let postedTime
+  try {
+    postedTime = await req.json()
+  } catch(e) {
+    return new Response(e)
+  }
+  let user
+  try {
+    user = await verifySession(req.headers.get("cookie"))
+  } catch(e) {
+    return new Response(e)
+  }
+  if (user.verified === false) {
+    const response = new Response("Session expired, please log in again")
+    response.headers.set('cookie', '')
+    return response
+  }
+  const times = await clock_times.get(user.session.email, "json")
+  const updatedTimes = times.filter(thing => {
+    return thing._id !== postedTime._id
+  })
+  const resTimes = JSON.stringify(updatedTimes)
+  await clock_times.put(user.session.email, resTimes)
+  return new Response(resTimes)
+}
+
+
 // delete user
 // update password
 
+// define data structures
+// make sure all email storage and reads are lower case
 
 // Create session
     // send custom cookie
